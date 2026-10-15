@@ -1,5 +1,27 @@
 # @tanstack/virtual-core
 
+## 3.19.5
+
+### Patch Changes
+
+- [#1324](https://github.com/TanStack/virtual/pull/1324) [`9c762fe`](https://github.com/TanStack/virtual/commit/9c762fe49021b602b1109e471ba38e3065cba5b5) - fix(virtual-core): scroll commands and corrections that stalled or were lost ([#1307](https://github.com/TanStack/virtual/issues/1307))
+  - On iOS 27 and later a `scrollTop` write no longer stops a fling but is overridden by it within a frame. A `scrollToIndex`, `scrollToOffset` or `scrollToEnd` issued during a fling now waits for the fling to end instead of being lost. The user taking over before then cancels it: a drag, a second flick, or a finger stopping the fling (iOS reports none of these with touch events while the fling runs). Corrections keep being held through the gesture as on every version.
+  - `scrollToOffset` / `scrollBy`: a row above the viewport growing after the write's read-back moved the element off the fixed target, and the command kept reconciling until the 5s safety valve. The target now moves with the correction.
+  - A prepend (`anchorTo: 'end'`) before the read-back of a scroll command was anchored against the stale offset and written over the command. It is now left to reconcile, like a resize in that window.
+  - A scroll event between the prepend's options change and the adapter's commit no longer loses the anchor (one blank frame when the element could not be written by commit time).
+  - A command's write clamped by a sizer that shrank below it before the read-back no longer reads as a user scroll; the command reaches its fresh target.
+
+- [#1318](https://github.com/TanStack/virtual/pull/1318) [`4a1a4fd`](https://github.com/TanStack/virtual/commit/4a1a4fdae1fa86cdda6603194876399f6651630d) - fix(virtual-core): on iOS, defer scroll corrections only for touch-driven scrolls (a finger down, or the momentum after it), so a programmatic landing like `scrollToOffset` compensates before paint instead of snapping later
+
+- [#1319](https://github.com/TanStack/virtual/pull/1319) [`3c61b6e`](https://github.com/TanStack/virtual/commit/3c61b6e30723e6af24d375ea1c5221d12a2e894d) - fix(virtual-core): hold a scroll correction the element cannot take instead of writing it ([#1287](https://github.com/TanStack/virtual/issues/1287))
+
+  A prepend's anchor delta or an above-viewport size change that lands while a `scrollTop` write is impossible (iOS during a touch gesture or its momentum tail, any WebKit while the element is rubber-banding past an edge) is now held: `scrollOffset` carries the corrected position, the rows and the total size are exposed shifted back by the held amount so every adapter keeps the reader's row where it is, and one write moves the element once a write is possible. Before, the write was discarded during the bounce on desktop Safari (the bounce stalled with the new rows and a blank top on screen), and on iOS the new rows showed through the bounce and snapped back at the flush.
+
+- [#1324](https://github.com/TanStack/virtual/pull/1324) [`9c762fe`](https://github.com/TanStack/virtual/commit/9c762fe49021b602b1109e471ba38e3065cba5b5) - refactor(virtual-core): simplify the scroll-correction state (no behaviour change)
+  - A scroll event is classified once (spurious re-emit, our own write's read-back, a clamped read-back or echo, or external) before the handler acts on it, a scroll command waiting for the iOS 27 momentum tail is a phase of its own, and the iOS touch gesture tracks a single `moved` flag.
+  - `scrollAdjustments` is deprecated: a correction is folded into `scrollOffset` at once, so it is always 0. Read `scrollOffset` alone; the getter stays.
+  - One edge case changes: corrections made while `enabled: false` used to accumulate, and a correction made after re-enabling but before the next update was added on top of them. They are no longer carried over.
+
 ## 3.19.4
 
 ### Patch Changes
